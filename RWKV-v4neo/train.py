@@ -364,6 +364,11 @@ if __name__ == "__main__":
             callbacks=[train_callback(args)],
         )
 
+    #temp
+    setattr(train_data, "global_rank", trainer.global_rank)
+    setattr(train_data, "real_epoch", 1)
+    setattr(train_data, "world_size", trainer.world_size)
+
     if trainer.global_rank == 0:
         for n in model.state_dict():
             shape = model.state_dict()[n].shape
