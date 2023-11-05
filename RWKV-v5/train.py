@@ -39,6 +39,16 @@ if __name__ == "__main__":
     parser.add_argument("--head_qk", default=0, type=int)  # my headQK trick
     parser.add_argument("--tiny_att_dim", default=0, type=int)  # tiny attention dim
     parser.add_argument("--tiny_att_layer", default=-999, type=int)  # tiny attention @ which layer
+    parser.add_argument("--time_mix_extra_dim", default=32, type=int) # for RWKV-6 only
+
+    # EXTRA HEPHAESTUS STUFF
+    # Activations
+    parser.add_argument("--gate_act_fn", default="silu", type=str) # activation function to use on time-mix gate
+    parser.add_argument("--ffn_act_fn", default="relu2", type=str) # activation function to use on k in channel mix
+    parser.add_argument("--ffn_forget_gate", default="sigmoid", type=str) # function serving as "forget gate" for receptance in channel mix
+    parser.add_argument("--rotary_act_drop_half", action="store_true")
+    parser.add_argument("--elephant_a", default=0.28, type=float)
+    parser.add_argument("--elephant_d", default=4.0, type=float)
 
     parser.add_argument("--lr_init", default=6e-4, type=float)  # 6e-4 for L12-D768, 4e-4 for L24-D1024, 3e-4 for L24-D2048
     parser.add_argument("--lr_final", default=1e-5, type=float)

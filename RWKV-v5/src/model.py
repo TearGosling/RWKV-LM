@@ -17,6 +17,8 @@ if importlib.util.find_spec('deepspeed'):
 
 # from deepspeed.runtime.fp16.onebit.zoadam import ZeroOneAdam
 
+from .hep_classes import ACT2CLS
+
 try:
     print('RWKV_MY_TESTING', os.environ["RWKV_MY_TESTING"])
 except:
@@ -142,6 +144,8 @@ class RWKV_TimeMix_RWKV5(MyModule):
         self.gate = nn.Linear(args.n_embd, args.dim_att, bias=False)
         self.ln_x = nn.GroupNorm(self.n_head, args.dim_att)
 
+        self.gate_act_fn = ACT2CLS[args.gate_act_fn](args)
+
     @MyFunction
     def jit_func(self, x):
         B, T, C = x.size()
@@ -155,7 +159,7 @@ class RWKV_TimeMix_RWKV5(MyModule):
         r = self.receptance(xr)
         k = self.key(xk)
         v = self.value(xv)
-        g = F.silu(self.gate(xg))
+        g = self.gate_act_fn(self.gate(xg))
 
         return r, k, v, g
 
@@ -199,15 +203,18 @@ class RWKV_ChannelMix(MyModule):
         self.receptance = nn.Linear(args.n_embd, args.n_embd, bias=False)
         self.value = nn.Linear(args.dim_ffn, args.n_embd, bias=False)
 
+        self.ffn_act_fn = ACT2CLS[args.ffn_act_fn](args)
+        self.forget_gate = ACT2CLS[args.ffn_forget_gate](args)
+
     @MyFunction
     def forward(self, x):
         xx = self.time_shift(x)
         xk = x * self.time_mix_k + xx * (1 - self.time_mix_k)
         xr = x * self.time_mix_r + xx * (1 - self.time_mix_r)
         k = self.key(xk)
-        k = torch.relu(k) ** 2
+        k = self.ffn_act_fn(k)
         kv = self.value(k)
-        return torch.sigmoid(self.receptance(xr)) * kv
+        return self.forget_gate(self.receptance(xr)) * kv
 
 class MishGLU(MyModule):
     def __init__(self, args, layer_id):
@@ -229,6 +236,8 @@ class MishGLU(MyModule):
             self.bb = nn.Linear(args.n_embd, args.dim_ffn, bias=False)
             self.value = nn.Linear(args.dim_ffn, args.n_embd, bias=False)
 
+            self.ffn_act_fn = ACT2CLS[args.ffn_act_fn](args) # should be set as "mish" whenever using MishGLU
+
     @MyFunction
     def forward(self, x):
         xx = self.time_shift(x)
@@ -236,7 +245,7 @@ class MishGLU(MyModule):
         xb = x * self.time_mix_r + xx * (1 - self.time_mix_r)
         a = self.aa(xa)
         b = self.bb(xb)
-        return self.value(a * F.mish(b))
+        return self.value(a * self.ffn_act_fn(b))
 
 ########################################################################################################
 # The RWKV Model with our blocks
